@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questions Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+</head>
+
+
+<style>
+    .active {
+        background-color: royalblue;
+    }
+
+    .div1{
+        display: block;
+        width: 100%;
+        margin: auto;
+        padding: 2rem;
+        border: 2px solid black;
+        border-radius: 50px;
+        grid-template-columns: 300px;
+        background-color: paleturquoise;
+    }
+
+    .container{
+        margin-top: 30px;
+        max-width: 600px;
+        min-width: 300px;
+    }
+
+    #text{
+        margin-top: 20px;
+        width: 90%;
+    }
+
+    .ratebtn{
+        display: inline;
+        padding: 7px;
+        width: 35px;
+        height: 35px;
+        margin: 10px 5px;
+        border-radius: 50%;
+        justify-content: center;
+        font-size: small;
+    }  
+
+    .genbtn {
+        margin-top: 15px;
+        margin-bottom: 10px;
+    } 
+
+    .submitbtn {
+        display: block;
+        margin: auto;
+        width: 100px;
+    }
+
+</style>
+<body>
+    
+    <div class="container">
+        <div class="div1">
+            <h2>Customer Survey</h2>
+            
+            <!--Current Question -->
+            <div class="row">
+                <div class="col-10"></div>
+                <div class="col-2" id="serial_no">
+                </div>
+            </div>
+            
+            <!-- Question details -->
+            <div class="row">
+                <div class="col" id="question_no">  
+                </div>
+        
+                <div class="col-11" id="question_text">
+                </div>
+            </div>
+
+            <form method="POST">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col" id="answer">
+                </div>
+            </div>
+    
+            <div class="row">
+                <div class="col-2">
+                    <input class="genbtn btn btn-secondary" type="button" onclick="previous()" id="previousbtn" value="Previous">
+                </div>
+                <div class="col"></div>
+                <div class="col-3">
+                    <input class="genbtn btn btn-secondary" type="button" value="Next" onclick="next()" id="nextbtn">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <input class="submitbtn btn btn-success" type="button" value="submit" id="submit" onclick="submitData()">
+                </div>
+            </div>
+            </form>
+        </div>    
+    </div>
+    <script>
+        var current = 1;
+        var questionData = {};
+        var questionsLen;
+        var questionText;
+        var answerType;
+        var ratingLimit;
+        var prev = 1;
+        var nex = 1;
+        var answerSubmit = -1;
+        var result = {};
+        
+
+        $( document ).ready(function() {
+            
+            $.ajax({
+                type: 'GET',
+                url: "{% url 'retrive' %}",
+                success: function (response) {
+                    console.log(response.data)
+                    Object.assign(questionData, response.data);
+                    questionsLen = Object.keys(questionData).length;
+                    console.log(questionsLen)
+                    update()
+                },
+                error: function (response) {
+                    console.log("error")
+                }
+            })
+        }) 
+
+        function next() {
+            if (current < questionsLen) {
+                current = current + 1
+                update();       
+            }
+        }
+
+        function previous() {
+            if (current > 1) {
+                current = current - 1
+                update(); 
+            }
+        }
+        
+        // update html 
+        function update() {
+            check()
+            questionText = questionData[current]['question_details'];
+            answerType = questionData[current]['answer_type'];
+            ratingLimit = questionData[current]['rating_limit'];
+            questionsId = questionData[current]['id'];
+
+            document.getElementById("question_no").innerHTML = current + '.';
+            document.getElementById("question_text").innerHTML = questionText;
+            document.getElementById("serial_no").innerHTML = current + "/" + questionsLen;
+            
+
+            $("#answer").empty();
+            if (answerType == "TEXT") {
+                const answer = $('#answer').append('<input onkeyUp="textTrigger(this)" value=""  id="text" type="text" name="answer">');
+               
+            }
+            else {
+                for (let index = 0; index < ratingLimit; index++) {
+                    $('#answer').append(`<input class="ratebtn" onclick="rateTrigger(this)" id="answer-${index+1}" type="button" name="answer" value="${index+1}">`);
+                }
+            }
+        }
+        
+
+        function check() {
+            prev = nex = 1
+            if (current >= questionsLen) {
+                nex = 0
+            }
+            if (current <= 1) {
+                prev = 0
+            }
+
+            update_button()
+        }
+
+        //  disable next button when current question is last question
+        //  disable previous button when current question is first question
+        
+        function update_button() {
+            var Dict = { 1: 0, 0: 1 }
+
+            document.getElementById('previousbtn').disabled = Dict[prev];
+            document.getElementById('nextbtn').disabled = Dict[nex];
+            document.getElementById('submit').disabled = Dict[1 - nex];;
+        }
+
+        function rateTrigger(btnObj) {
+            if(answerSubmit !== -1){
+                $(`#answer-${answerSubmit}`).removeClass('active');
+            }
+            
+            $(`#${btnObj.id}`).addClass('active');
+            console.log(btnObj.value);
+            answerSubmit = btnObj.value;
+            result[questionsId] = answerSubmit;
+            console.log(result);
+        }
+
+        function textTrigger(txtObj) {
+            console.log(txtObj.value);
+            answerSubmit = txtObj.value;
+            result[questionsId] = answerSubmit;
+        }
+
+        function submitData() {
+            if (Object.keys(result).length == questionsLen) {
+                console.log("submitting data!");
+                // post data
+                $.ajax({
+                    type: 'POST',
+                    url: "{% url 'questions' %}",
+                    headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                    dataType: "json",
+                    data: result,
+                    success: function (response) {
+                        console.log('response success')
+                        alert("Thank you! Response Succeefully Submitted.")
+                        $(location).attr('href', '/')
+                    },
+                    error: function (response) {
+                        console.log("error")
+                    }
+                }) 
+            }
+            else{
+                alert("Please answer all the questions.")
+            }
+        }
+
+    </script>
+
+</body>
+</html>
